@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>FeS Pads — Ambientes & Octopad Studio</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        fes: {
+                            50: '#f4f3ff',
+                            100: '#ebe9fe',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            900: '#0f0c20',
+                            950: '#070512',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            min-height: -webkit-fill-available;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            background-color: #070512;
+            color: #f3f4f6;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        /* Interactive Pad Press States */
+        .pad-btn {
+            transition: transform 0.08s ease, box-shadow 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+        }
+        
+        .pad-btn:active, .pad-active {
+            transform: scale(0.96);
+        }
+
+        /* Custom Dark Range Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #1e1938;
+            border-radius: 999px;
+            height: 6px;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #a78bfa;
+            box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+
+        /* Glassmorphism Styles */
+        .glass-panel {
+            background: rgba(15, 12, 32, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .fes-glow {
+            box-shadow: 0 0 30px rgba(139, 92, 246, 0.35);
+        }
+
+        /* Metronome LED Flash Animation */
+        @keyframes pulse-led {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 0.3; }
+        }
+
+        .led-flash {
+            animation: pulse-led 0.12s ease-out;
+        }
+
+        .ambient-bg {
+            background: radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.15), transparent 70%);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-full font-sans antialiased text-slate-100 select-none pb-safe ambient-bg">
+
+    <!-- Audio element to bypass iOS Silent Switch mode -->
+    <audio id="silent-audio-bypass" loop playsinline preload="auto">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
+    <!-- HEADER PRINCIPAL -->
+    <header class="glass-panel sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b border-purple-900/30">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-black text-lg tracking-wider leading-tight text-white flex items-center gap-2">
+                    FeS PADS <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800">STUDIO PRO</span>
+                </h1>
+                <p class="text-[11px] text-purple-300/70 font-medium">Pads Ambientes & Octopad Multi-Touch</p>
+            </div>
+        </div>
+
+        <!-- Indicadores de Status e Panico -->
+        <div class="flex items-center gap-2">
+            <button id="ios-audio-btn" onclick="unlockAudioiOS()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition active:scale-95">
+                <span id="audio-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span id="audio-status-text">Ativar Áudio</span>
+            </button>
+            <button onclick="panicStopAll()" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 active:scale-95 transition">
+                PARAR TUDO
+            </button>
+        </div>
+    </header>
+
+    <!-- NAVEGAÇÃO DE ABAS -->
+    <div class="px-4 pt-3 bg-fes-950/80 border-b border-purple-900/20">
+        <div class="flex max-w-md mx-auto p-1 bg-fes-900/90 rounded-2xl border border-purple-900/40">
+            <button id="tab-pads-btn" onclick="switchTab('pads')" class="flex-1 py-2.5 text-xs font-bold rounded-xl text-white bg-purple-600 shadow-md transition-all duration-200">
+                PADS AMBIENTES
+            </button>
+            <button id="tab-octopad-btn" onclick="switchTab('octopad')" class="flex-1 py-2.5 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all duration-200">
+                OCTOPAD STUDIO
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-1 overflow-y-auto p-3 md:p-5 max-w-6xl mx-auto w-full">
+
+        <!-- ABA 1: PADS AMBIENTES -->
+        <section id="tab-pads" class="space-y-4">
+            
+            <!-- Visualizador e Tom Ativo -->
+            <div class="glass-panel p-5 rounded-3xl relative overflow-hidden flex flex-col items-center justify-center border border-purple-900/40 shadow-2xl">
+                <canvas id="visualizer-canvas" class="absolute inset-0 w-full h-full opacity-40 pointer-events-none"></canvas>
+
+                <div class="relative z-10 text-center space-y-1 my-2">
+                    <span class="text-[11px] uppercase font-bold tracking-widest text-purple-400">Tom FeS Pad em Execução</span>
+                    <div id="active-key-display" class="text-5xl md:text-6xl font-black text-white tracking-tight drop-shadow-md">
+                        NENHUM
+                    </div>
+                    <p id="active-scale-display" class="text-xs text-purple-300/70 font-semibold">Selecione um tom para iniciar o fundo contínuo</p>
+                </div>
+
+                <!-- Toggle de Escala Maior / Menor -->
+                <div class="relative z-10 flex items-center gap-2 mt-2 bg-fes-950/90 p-1.5 rounded-2xl border border-purple-900/50">
+                    <button id="mode-major" onclick="setScaleMode('major')" class="px-5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow-md transition">
+                        ESCALA MAIOR
+                    </button>
+                    <button id="mode-minor" onclick="setScaleMode('minor')" class="px-5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white transition">
+                        ESCALA MENOR
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grade de Tons Cromáticos (12 Tons) -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center px-1">
+                    <label class="text-xs font-bold text-purple-300/80 uppercase tracking-wider block">Selecione o Tom (Crossfade 2.0s)</label>
+                    <span class="text-[10px] font-semibold text-purple-400">12 Tons Cromáticos</span>
+                </div>
+                <div id="pads-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                    <!-- Gerado dinamicamente via JS -->
+                </div>
+            </div>
+
+            <!-- Presets de Timbre do Pad -->
+            <div class="space-y-2 pt-1">
+                <label class="text-xs font-bold text-purple-300/80 uppercase tracking-wider block px-1">Presets de Timbre</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <button onclick="setPadPreset('worship')" id="preset-worship" class="preset-pad-btn p-3 rounded-2xl border border-purple-500/50 bg-purple-950/50 text-purple-200 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition fes-glow">
+                        <span>Worship Quente</span>
+                        <span class="text-[10px] opacity-70 font-normal">Aveludado & Profundo</span>
+                    </button>
+                    <button onclick="setPadPreset('shimmer')" id="preset-shimmer" class="preset-pad-btn p-3 rounded-2xl border border-purple-900/40 bg-fes-900/80 text-slate-300 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition">
+                        <span>Shimmer Celestial</span>
+                        <span class="text-[10px] opacity-70 font-normal">Brilho Agudo & Reverb</span>
+                    </button>
+                    <button onclick="setPadPreset('sub')" id="preset-sub" class="preset-pad-btn p-3 rounded-2xl border border-purple-900/40 bg-fes-900/80 text-slate-300 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition">
+                        <span>Sub-Acoustic</span>
+                        <span class="text-[10px] opacity-70 font-normal">Foco nos Graves</span>
+                    </button>
+                    <button onclick="setPadPreset('analog')" id="preset-analog" class="preset-pad-btn p-3 rounded-2xl border border-purple-900/40 bg-fes-900/80 text-slate-300 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition">
+                        <span>Synth Analógico</span>
+                        <span class="text-[10px] opacity-70 font-normal">Rico & Vintage</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controles do Pad Ambiente -->
+            <div class="glass-panel p-4 rounded-3xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 border border-purple-900/30">
+                <div>
+                    <div class="flex justify-between text-xs font-medium mb-1">
+                        <span class="text-slate-300">Volume Máster</span>
+                        <span id="val-pad-vol" class="text-purple-400 font-bold">80%</span>
+                    </div>
+                    <input type="range" id="slider-pad-vol" min="0" max="1" step="0.01" value="0.8" oninput="updatePadControls()" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs font-medium mb-1">
+                        <span class="text-slate-300">Brilho (Cutoff)</span>
+                        <span id="val-pad-cutoff" class="text-purple-400 font-bold">1200 Hz</span>
+                    </div>
+                    <input type="range" id="slider-pad-cutoff" min="200" max="6000" step="10" value="1200" oninput="updatePadControls()" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs font-medium mb-1">
+                        <span class="text-slate-300">Sub-Bass</span>
+                        <span id="val-pad-sub" class="text-purple-400 font-bold">70%</span>
+                    </div>
+                    <input type="range" id="slider-pad-sub" min="0" max="1" step="0.01" value="0.7" oninput="updatePadControls()" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs font-medium mb-1">
+                        <span class="text-slate-300">Oitavador (Agudos)</span>
+                        <span id="val-pad-high" class="text-purple-400 font-bold">40%</span>
+                    </div>
+                    <input type="range" id="slider-pad-high" min="0" max="1" step="0.01" value="0.4" oninput="updatePadControls()" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs font-medium mb-1">
+                        <span class="text-slate-300">Reverb Mix</span>
+                        <span id="val-pad-reverb" class="text-purple-400 font-bold">65%</span>
+                    </div>
+                    <input type="range" id="slider-pad-reverb" min="0" max="1" step="0.01" value="0.65" oninput="updatePadControls()" class="w-full">
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ABA 2: OCTOPAD STUDIO -->
+        <section id="tab-octopad" class="space-y-4 hidden">
+            
+            <!-- Barra Superior do Octopad (Kit & Metrônomo) -->
+            <div class="glass-panel p-3 md:p-4 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-3 border border-purple-900/30">
+                
+                <!-- Seleção de Kit -->
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <span class="text-xs font-bold text-purple-300/80 uppercase">Kit:</span>
+                    <select id="octopad-kit-select" onchange="changeOctopadKit(this.value)" class="bg-fes-900 border border-purple-800/60 text-purple-300 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-purple-500 w-full md:w-auto">
+                        <option value="worship">Worship Hybrid (Bumbo Invertido & Swells)</option>
+                        <option value="acoustic">Acoustic Gospel (Caixa & Pratos Secos)</option>
+                        <option value="electronic">Electronic Pop & FX</option>
+                    </select>
+                </div>
+
+                <!-- Metrônomo com Tap Tempo -->
+                <div class="flex items-center gap-3 bg-fes-950/80 px-3.5 py-2 rounded-2xl border border-purple-900/40 w-full md:w-auto justify-between md:justify-start">
+                    <div class="flex items-center gap-2">
+                        <div id="metronome-led" class="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></div>
+                        <span class="text-xs font-bold text-slate-300">Metrônomo:</span>
+                        <span id="bpm-display" class="text-xs font-black text-purple-400 w-14">72 BPM</span>
+                    </div>
+                    <input type="range" id="slider-bpm" min="40" max="220" value="72" oninput="updateBPM(this.value)" class="w-20">
+                    <button onclick="handleTapTempo()" class="px-3 py-1 bg-fes-900 hover:bg-purple-900 active:scale-95 text-[11px] font-bold text-purple-200 rounded-xl border border-purple-800">
+                        TAP
+                    </button>
+                    <button id="metronome-toggle-btn" onclick="toggleMetronome()" class="px-3 py-1 bg-purple-600 active:scale-95 text-xs font-bold text-white rounded-xl shadow-md">
+                        LIGAR
+                    </button>
+                </div>
+            </div>
+
+            <!-- Octopad 9 Pads (Grade 3x3) -->
+            <div class="grid grid-cols-3 gap-2.5 sm:gap-4 max-w-2xl mx-auto">
+                
+                <!-- Pad 1: Reverse Kick -->
+                <button onpointerdown="triggerPad(0, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-indigo-950 to-fes-900 border-2 border-indigo-500/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-indigo-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-indigo-900/80 text-indigo-300 border border-indigo-700/50">PAD 1 [Tecla 1/Q]</span>
+                        <span class="w-2 h-2 rounded-full bg-indigo-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">BUMBO INVERTIDO</div>
+                        <div class="text-[10px] text-indigo-300/70 font-medium">Reverse Kick Swell</div>
+                    </div>
+                </button>
+
+                <!-- Pad 2: Reverse Swell Drop -->
+                <button onpointerdown="triggerPad(1, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-purple-950 to-fes-900 border-2 border-purple-500/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-purple-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-900/80 text-purple-300 border border-purple-700/50">PAD 2 [Tecla 2/W]</span>
+                        <span class="w-2 h-2 rounded-full bg-purple-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">SWELL DROP</div>
+                        <div class="text-[10px] text-purple-300/70 font-medium">Crescendo Estéreo</div>
+                    </div>
+                </button>
+
+                <!-- Pad 3: Sub Kick -->
+                <button onpointerdown="triggerPad(2, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-indigo-950 to-fes-900 border-2 border-indigo-500/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-indigo-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-indigo-900/80 text-indigo-300 border border-indigo-700/50">PAD 3 [Tecla 3/E]</span>
+                        <span class="w-2 h-2 rounded-full bg-indigo-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">SUB KICK</div>
+                        <div class="text-[10px] text-indigo-300/70 font-medium">Impacto Sub-Grave</div>
+                    </div>
+                </button>
+
+                <!-- Pad 4: Snare -->
+                <button onpointerdown="triggerPad(3, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-slate-900 to-fes-900 border-2 border-slate-700/60 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-slate-500">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">PAD 4 [Tecla 4/A]</span>
+                        <span class="w-2 h-2 rounded-full bg-slate-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">CAIXA WORSHIP</div>
+                        <div class="text-[10px] text-slate-400 font-medium">Snare Encorpada</div>
+                    </div>
+                </button>
+
+                <!-- Pad 5: Rimshot -->
+                <button onpointerdown="triggerPad(4, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-slate-900 to-fes-900 border-2 border-slate-700/60 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-slate-500">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">PAD 5 [Tecla 5/S]</span>
+                        <span class="w-2 h-2 rounded-full bg-slate-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">RIMSHOT / ARO</div>
+                        <div class="text-[10px] text-slate-400 font-medium">Ataque Seco Articulado</div>
+                    </div>
+                </button>
+
+                <!-- Pad 6: Clap -->
+                <button onpointerdown="triggerPad(5, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-slate-900 to-fes-900 border-2 border-slate-700/60 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-slate-500">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">PAD 6 [Tecla 6/D]</span>
+                        <span class="w-2 h-2 rounded-full bg-slate-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">CLAP PALMAS</div>
+                        <div class="text-[10px] text-slate-400 font-medium">Palmas de Estúdio</div>
+                    </div>
+                </button>
+
+                <!-- Pad 7: Hi-Hat -->
+                <button onpointerdown="triggerPad(6, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-amber-950/60 to-fes-900 border-2 border-amber-600/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-amber-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-800">PAD 7 [Tecla 7/Z]</span>
+                        <span class="w-2 h-2 rounded-full bg-amber-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">HI-HAT / CHIMBAL</div>
+                        <div class="text-[10px] text-amber-300/70 font-medium">Articulação Rápida</div>
+                    </div>
+                </button>
+
+                <!-- Pad 8: Crash Cymbal -->
+                <button onpointerdown="triggerPad(7, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-amber-950/60 to-fes-900 border-2 border-amber-600/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-amber-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-800">PAD 8 [Tecla 8/X]</span>
+                        <span class="w-2 h-2 rounded-full bg-amber-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">PRATO CRASH</div>
+                        <div class="text-[10px] text-amber-300/70 font-medium">Sustentação Rica</div>
+                    </div>
+                </button>
+
+                <!-- Pad 9: Reverse Cymbal -->
+                <button onpointerdown="triggerPad(8, event)" class="pad-btn relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-cyan-950/60 to-fes-900 border-2 border-cyan-500/40 p-3 flex flex-col justify-between text-left overflow-hidden shadow-lg hover:border-cyan-400">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-800">PAD 9 [Tecla 9/C]</span>
+                        <span class="w-2 h-2 rounded-full bg-cyan-400/50"></span>
+                    </div>
+                    <div>
+                        <div class="font-black text-sm sm:text-base text-white leading-tight">PRATO INVERTIDO</div>
+                        <div class="text-[10px] text-cyan-300/70 font-medium">Puxada / Reverse Cymbal</div>
+                    </div>
+                </button>
+
+            </div>
+
+            <!-- Editor / Inspetor de Pad Selecionado -->
+            <div class="glass-panel p-4 rounded-3xl border border-purple-900/30 max-w-2xl mx-auto space-y-3">
+                <div class="flex items-center justify-between border-b border-purple-900/30 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-extrabold text-purple-400 uppercase">Inspetor de Pad:</span>
+                        <span id="inspector-pad-name" class="text-xs font-bold text-white bg-purple-900/60 px-2.5 py-1 rounded-lg">PAD 1 — Bumbo Invertido</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400">Clique em um pad para editar</span>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                        <div class="flex justify-between text-[11px] font-semibold mb-1">
+                            <span class="text-slate-300">Pitch (Afinação)</span>
+                            <span id="val-inspector-pitch" class="text-purple-400">0 semitons</span>
+                        </div>
+                        <input type="range" id="slider-inspector-pitch" min="-12" max="12" step="1" value="0" oninput="updatePadInspectorParam('pitch', this.value)" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] font-semibold mb-1">
+                            <span class="text-slate-300">Pan (L/R)</span>
+                            <span id="val-inspector-pan" class="text-purple-400">C</span>
+                        </div>
+                        <input type="range" id="slider-inspector-pan" min="-1" max="1" step="0.05" value="0" oninput="updatePadInspectorParam('pan', this.value)" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] font-semibold mb-1">
+                            <span class="text-slate-300">Volume</span>
+                            <span id="val-inspector-vol" class="text-purple-400">100%</span>
+                        </div>
+                        <input type="range" id="slider-inspector-vol" min="0" max="1" step="0.01" value="1" oninput="updatePadInspectorParam('volume', this.value)" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] font-semibold mb-1">
+                            <span class="text-slate-300">Reverb Send</span>
+                            <span id="val-inspector-reverb" class="text-purple-400">40%</span>
+                        </div>
+                        <input type="range" id="slider-inspector-reverb" min="0" max="1" step="0.01" value="0.4" oninput="updatePadInspectorParam('reverb', this.value)" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+        // Global Audio Context & Web Audio Engine
+        let audioCtx = null;
+        let masterGainNode = null;
+        let reverbNode = null;
+        let padFilterNode = null;
+        let padMasterGain = null;
+        let analyserNode = null;
+
+        // Core App States
+        let currentScaleMode = 'major'; // 'major' or 'minor'
+        let activeKeyIndex = null;
+        let activeVoices = []; // Currently playing oscillator voices for pad
+        let currentPreset = 'worship';
+        let selectedOctopadIndex = 0;
+
+        // Metronome State
+        let metronomeInterval = null;
+        let isMetronomeOn = false;
+        let currentBPM = 72;
+        let tapTimes = [];
+
+        // 12 Chromatic Keys Definition
+        const CHROMATIC_KEYS = [
+            { name: 'C', label: 'Dó', freq: 130.81 },
+            { name: 'C# / D♭', label: 'Dó#', freq: 138.59 },
+            { name: 'D', label: 'Ré', freq: 146.83 },
+            { name: 'D# / E♭', label: 'Ré#', freq: 155.56 },
+            { name: 'E', label: 'Mi', freq: 164.81 },
+            { name: 'F', label: 'Fá', freq: 174.61 },
+            { name: 'F# / G♭', label: 'Fá#', freq: 185.00 },
+            { name: 'G', label: 'Sol', freq: 196.00 },
+            { name: 'G# / A♭', label: 'Sol#', freq: 207.65 },
+            { name: 'A', label: 'Lá', freq: 220.00 },
+            { name: 'A# / B♭', label: 'Lá#', freq: 233.08 },
+            { name: 'B', label: 'Si', freq: 246.94 }
+        ];
+
+        // Octopad Sound Parameters
+        let octopadParams = [
+            { name: 'PAD 1 — Bumbo Invertido', pitch: 0, pan: 0, volume: 1.0, reverb: 0.35 },
+            { name: 'PAD 2 — Swell Drop', pitch: 0, pan: 0, volume: 0.9, reverb: 0.65 },
+            { name: 'PAD 3 — Sub Kick', pitch: 0, pan: 0, volume: 1.0, reverb: 0.1 },
+            { name: 'PAD 4 — Caixa Worship', pitch: 0, pan: 0, volume: 0.95, reverb: 0.4 },
+            { name: 'PAD 5 — Rimshot / Aro', pitch: 0, pan: 0, volume: 0.85, reverb: 0.3 },
+            { name: 'PAD 6 — Clap Palmas', pitch: 0, pan: 0, volume: 0.9, reverb: 0.45 },
+            { name: 'PAD 7 — Hi-Hat / Chimbal', pitch: 0, pan: 0, volume: 0.8, reverb: 0.15 },
+            { name: 'PAD 8 — Prato Crash', pitch: 0, pan: 0, volume: 0.85, reverb: 0.7 },
+            { name: 'PAD 9 — Prato Invertido', pitch: 0, pan: 0, volume: 0.9, reverb: 0.75 }
+        ];
+
+        function initAudioEngine() {
+            if (audioCtx) return;
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContextClass();
+
+            // Master Output Node
+            masterGainNode = audioCtx.createGain();
+            masterGainNode.gain.setValueAtTime(0.9, audioCtx.currentTime);
+
+            // Analyser Node for Canvas Visualizer
+            analyserNode = audioCtx.createAnalyser();
+            analyserNode.fftSize = 256;
+
+            // Synthesis Reverb Impulse Response Generator
+            reverbNode = audioCtx.createConvolver();
+            reverbNode.buffer = createStereoReverbBuffer(audioCtx, 3.2, 2.8);
+
+            // Pad Sub-master Filter & Gain
+            padFilterNode = audioCtx.createBiquadFilter();
+            padFilterNode.type = 'lowpass';
+            padFilterNode.frequency.setValueAtTime(1200, audioCtx.currentTime);
+
+            padMasterGain = audioCtx.createGain();
+            padMasterGain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+
+            // Connect Ambient Pad Signal Path
+            padFilterNode.connect(padMasterGain);
+            padMasterGain.connect(masterGainNode);
+            padMasterGain.connect(reverbNode);
+            reverbNode.connect(masterGainNode);
+
+            masterGainNode.connect(analyserNode);
+            analyserNode.connect(audioCtx.destination);
+
+            updateAudioStatusUI(true);
+            startVisualizerLoop();
+        }
+
+        function createStereoReverbBuffer(ctx, duration, decay) {
+            const sampleRate = ctx.sampleRate;
+            const length = sampleRate * duration;
+            const impulse = ctx.createBuffer(2, length, sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = length - i;
+                left[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay);
+            }
+            return impulse;
+        }
+
+        function unlockAudioiOS() {
+            initAudioEngine();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // iOS Silent Switch Bypass Trick
+            const silentAudio = document.getElementById('silent-audio-bypass');
+            if (silentAudio) {
+                silentAudio.play().then(() => {
+                    updateAudioStatusUI(true);
+                }).catch(err => {
+                    console.log('iOS silent audio bypass autoplay prevented:', err);
+                });
+            }
+        }
+
+        function updateAudioStatusUI(active) {
+            const btn = document.getElementById('ios-audio-btn');
+            const dot = document.getElementById('audio-status-dot');
+            const txt = document.getElementById('audio-status-text');
+
+            if (active && audioCtx && audioCtx.state === 'running') {
+                btn.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                txt.innerText = 'Áudio Ativo';
+            }
+        }
+
+        function renderKeyGrid() {
+            const grid = document.getElementById('pads-grid');
+            grid.innerHTML = '';
+
+            CHROMATIC_KEYS.forEach((key, index) => {
+                const btn = document.createElement('button');
+                btn.id = `key-btn-${index}`;
+                btn.onpointerdown = (e) => {
+                    e.preventDefault();
+                    unlockAudioiOS();
+                    selectPadKey(index);
+                };
+
+                btn.className = 'pad-btn p-3.5 rounded-2xl border border-purple-900/40 bg-fes-900/70 hover:border-purple-500/60 flex flex-col items-center justify-center transition shadow-lg relative overflow-hidden group';
+                btn.innerHTML = `
+                    <span class="text-xl md:text-2xl font-black text-white tracking-tight group-hover:scale-110 transition-transform">${key.name}</span>
+                    <span class="text-[10px] font-medium text-purple-300/60 uppercase">${key.label}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectPadKey(index) {
+            if (activeKeyIndex === index) {
+                // Toggle off current playing pad
+                stopPadVoices(2.0);
+                activeKeyIndex = null;
+                updatePadKeyUI();
+                return;
+            }
+
+            activeKeyIndex = index;
+            updatePadKeyUI();
+            playPadKeyVoices(CHROMATIC_KEYS[index]);
+        }
+
+        function setScaleMode(mode) {
+            currentScaleMode = mode;
+            document.getElementById('mode-major').className = mode === 'major' 
+                ? 'px-5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow-md transition'
+                : 'px-5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white transition';
+
+            document.getElementById('mode-minor').className = mode === 'minor'
+                ? 'px-5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow-md transition'
+                : 'px-5 py-1.5 rounded-xl text-xs font-extrabold text-slate-400 hover:text-white transition';
+
+            if (activeKeyIndex !== null) {
+                playPadKeyVoices(CHROMATIC_KEYS[activeKeyIndex]);
+            }
+        }
+
+        function playPadKeyVoices(keyObj) {
+            initAudioEngine();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Smooth crossfade: Fade out old voices over 2 seconds
+            stopPadVoices(2.0);
+
+            const now = audioCtx.currentTime;
+            const fadeGain = audioCtx.createGain();
+            fadeGain.gain.setValueAtTime(0, now);
+            fadeGain.gain.linearRampToValueAtTime(1, now + 2.0); // 2.0s Fade In Envelope
+            fadeGain.connect(padFilterNode);
+
+            const rootFreq = keyObj.freq;
+            // Intervals in semitones
+            const thirdInterval = currentScaleMode === 'major' ? 4 : 3;
+            const fifthInterval = 7;
+            const octaveInterval = 12;
+
+            const subGainVal = parseFloat(document.getElementById('slider-pad-sub').value);
+            const highGainVal = parseFloat(document.getElementById('slider-pad-high').value);
+
+            // Oscillators configuration
+            const oscConfigs = [
+                { freq: rootFreq / 2, type: 'sine', gain: subGainVal * 0.8 }, // Sub Bass
+                { freq: rootFreq, type: 'sawtooth', gain: 0.35 },             // Fundamental Saw
+                { freq: rootFreq, type: 'triangle', gain: 0.4 },             // Fundamental Tri
+                { freq: getFreqFromInterval(rootFreq, thirdInterval), type: 'triangle', gain: 0.25 }, // 3rd (Major/Minor)
+                { freq: getFreqFromInterval(rootFreq, fifthInterval), type: 'sine', gain: 0.3 },      // 5th
+                { freq: getFreqFromInterval(rootFreq, octaveInterval), type: 'sawtooth', gain: highGainVal * 0.25 } // Oitavador
+            ];
+
+            const currentVoicesList = [];
+
+            oscConfigs.forEach(cfg => {
+                const osc = audioCtx.createOscillator();
+                const vGain = audioCtx.createGain();
+
+                osc.type = cfg.type;
+                osc.frequency.setValueAtTime(cfg.freq, now);
+
+                vGain.gain.setValueAtTime(cfg.gain, now);
+
+                osc.connect(vGain);
+                vGain.connect(fadeGain);
+
+                osc.start(now);
+                currentVoicesList.push({ osc, gainNode: vGain, fadeGain });
+            });
+
+            activeVoices.push({ list: currentVoicesList, masterFade: fadeGain });
+        }
+
+        function getFreqFromInterval(baseFreq, semitones) {
+            return baseFreq * Math.pow(2, semitones / 12);
+        }
+
+        function stopPadVoices(fadeDuration = 2.0) {
+            const now = audioCtx ? audioCtx.currentTime : 0;
+            activeVoices.forEach(voiceObj => {
+                if (voiceObj.masterFade && audioCtx) {
+                    voiceObj.masterFade.gain.cancelScheduledValues(now);
+                    voiceObj.masterFade.gain.setValueAtTime(voiceObj.masterFade.gain.value, now);
+                    voiceObj.masterFade.gain.linearRampToValueAtTime(0, now + fadeDuration);
+
+                    setTimeout(() => {
+                        voiceObj.list.forEach(v => {
+                            try { v.osc.stop(); } catch(e){}
+                        });
+                    }, fadeDuration * 1000 + 100);
+                }
+            });
+            activeVoices = [];
+        }
+
+        function updatePadKeyUI() {
+            CHROMATIC_KEYS.forEach((_, idx) => {
+                const btn = document.getElementById(`key-btn-${idx}`);
+                if (!btn) return;
+                if (idx === activeKeyIndex) {
+                    btn.className = 'pad-btn p-3.5 rounded-2xl border-2 border-purple-400 bg-purple-600 text-white flex flex-col items-center justify-center transition shadow-xl fes-glow scale-105';
+                } else {
+                    btn.className = 'pad-btn p-3.5 rounded-2xl border border-purple-900/40 bg-fes-900/70 hover:border-purple-500/60 flex flex-col items-center justify-center transition shadow-lg relative overflow-hidden group';
+                }
+            });
+
+            const keyDisplay = document.getElementById('active-key-display');
+            const scaleDisplay = document.getElementById('active-scale-display');
+
+            if (activeKeyIndex !== null) {
+                const k = CHROMATIC_KEYS[activeKeyIndex];
+                keyDisplay.innerText = k.name;
+                scaleDisplay.innerText = `PAD AMBIENTE EM ${k.label.toUpperCase()} (${currentScaleMode === 'major' ? 'ESCALA MAIOR' : 'ESCALA MENOR'})`;
+            } else {
+                keyDisplay.innerText = 'NENHUM';
+                scaleDisplay.innerText = 'Selecione um tom para iniciar o fundo contínuo';
+            }
+        }
+
+        function updatePadControls() {
+            if (!audioCtx) return;
+
+            const vol = parseFloat(document.getElementById('slider-pad-vol').value);
+            const cutoff = parseFloat(document.getElementById('slider-pad-cutoff').value);
+            const reverb = parseFloat(document.getElementById('slider-pad-reverb').value);
+
+            document.getElementById('val-pad-vol').innerText = `${Math.round(vol * 100)}%`;
+            document.getElementById('val-pad-cutoff').innerText = `${cutoff} Hz`;
+            document.getElementById('val-pad-reverb').innerText = `${Math.round(reverb * 100)}%`;
+            document.getElementById('val-pad-sub').innerText = `${Math.round(parseFloat(document.getElementById('slider-pad-sub').value) * 100)}%`;
+            document.getElementById('val-pad-high').innerText = `${Math.round(parseFloat(document.getElementById('slider-pad-high').value) * 100)}%`;
+
+            padMasterGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            padFilterNode.frequency.setValueAtTime(cutoff, audioCtx.currentTime);
+        }
+
+        function setPadPreset(presetName) {
+            currentPreset = presetName;
+
+            const sliders = {
+                vol: document.getElementById('slider-pad-vol'),
+                cutoff: document.getElementById('slider-pad-cutoff'),
+                sub: document.getElementById('slider-pad-sub'),
+                high: document.getElementById('slider-pad-high'),
+                reverb: document.getElementById('slider-pad-reverb')
+            };
+
+            if (presetName === 'worship') {
+                sliders.vol.value = 0.8;
+                sliders.cutoff.value = 1200;
+                sliders.sub.value = 0.7;
+                sliders.high.value = 0.4;
+                sliders.reverb.value = 0.65;
+            } else if (presetName === 'shimmer') {
+                sliders.vol.value = 0.85;
+                sliders.cutoff.value = 3800;
+                sliders.sub.value = 0.5;
+                sliders.high.value = 0.9;
+                sliders.reverb.value = 0.85;
+            } else if (presetName === 'sub') {
+                sliders.vol.value = 0.9;
+                sliders.cutoff.value = 600;
+                sliders.sub.value = 1.0;
+                sliders.high.value = 0.1;
+                sliders.reverb.value = 0.4;
+            } else if (presetName === 'analog') {
+                sliders.vol.value = 0.8;
+                sliders.cutoff.value = 2200;
+                sliders.sub.value = 0.6;
+                sliders.high.value = 0.5;
+                sliders.reverb.value = 0.5;
+            }
+
+            document.querySelectorAll('.preset-pad-btn').forEach(btn => {
+                btn.className = 'preset-pad-btn p-3 rounded-2xl border border-purple-900/40 bg-fes-900/80 text-slate-300 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition';
+            });
+
+            const activePresetBtn = document.getElementById(`preset-${presetName}`);
+            if (activePresetBtn) {
+                activePresetBtn.className = 'preset-pad-btn p-3 rounded-2xl border border-purple-500/50 bg-purple-950/50 text-purple-200 font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition fes-glow';
+            }
+
+            updatePadControls();
+            if (activeKeyIndex !== null) {
+                playPadKeyVoices(CHROMATIC_KEYS[activeKeyIndex]);
+            }
+        }
+
+        function triggerPad(padIndex, e) {
+            if (e) e.preventDefault();
+            initAudioiOSAndPad(padIndex);
+        }
+
+        function initAudioiOSAndPad(padIndex) {
+            unlockAudioiOS();
+            selectOctopadInspector(padIndex);
+
+            const now = audioCtx.currentTime;
+            const p = octopadParams[padIndex];
+            const pitchFactor = Math.pow(2, p.pitch / 12); // Pitch Shift ratio
+
+            // Pad Gain & Panner
+            const pGain = audioCtx.createGain();
+            pGain.gain.setValueAtTime(p.volume, now);
+
+            const pPanner = audioCtx.createStereoPanner();
+            pPanner.pan.setValueAtTime(p.pan, now);
+
+            pGain.connect(pPanner);
+            pPanner.connect(masterGainNode);
+
+            // Reverb Send
+            if (p.reverb > 0) {
+                const rGain = audioCtx.createGain();
+                rGain.gain.setValueAtTime(p.reverb, now);
+                pGain.connect(rGain);
+                rGain.connect(reverbNode);
+            }
+
+            // SYNTHESIS PERCUSSION ENGINES
+            switch(padIndex) {
+                case 0: // BUMBO INVERTIDO (REVERSE KICK)
+                    playReverseKick(now, pGain, pitchFactor);
+                    break;
+                case 1: // REVERSE SWELL DROP
+                    playReverseSwellDrop(now, pGain, pitchFactor);
+                    break;
+                case 2: // SUB KICK
+                    playSubKick(now, pGain, pitchFactor);
+                    break;
+                case 3: // CAIXA WORSHIP (SNARE)
+                    playSnare(now, pGain, pitchFactor);
+                    break;
+                case 4: // RIMSHOT
+                    playRimshot(now, pGain, pitchFactor);
+                    break;
+                case 5: // CLAP
+                    playClap(now, pGain, pitchFactor);
+                    break;
+                case 6: // HI-HAT
+                    playHiHat(now, pGain, pitchFactor);
+                    break;
+                case 7: // CRASH
+                    playCrash(now, pGain, pitchFactor);
+                    break;
+                case 8: // PRATO INVERTIDO (REVERSE CYMBAL)
+                    playReverseCymbal(now, pGain, pitchFactor);
+                    break;
+            }
+        }
+
+        // 1. BUMBO INVERTIDO (Reverse Kick)
+        function playReverseKick(now, outGain, pitchRatio) {
+            const duration = 0.45;
+            // Reverse pitch sweep sine
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(30 * pitchRatio, now);
+            osc.frequency.exponentialRampToValueAtTime(180 * pitchRatio, now + duration * 0.85);
+            osc.frequency.linearRampToValueAtTime(40 * pitchRatio, now + duration);
+
+            oscGain.gain.setValueAtTime(0.01, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.9, now + duration * 0.85);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(oscGain);
+            oscGain.connect(outGain);
+
+            osc.start(now);
+            osc.stop(now + duration + 0.05);
+
+            // Filtered Noise Swell
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(100, now);
+            filter.frequency.exponentialRampToValueAtTime(1200 * pitchRatio, now + duration * 0.85);
+
+            nGain.gain.setValueAtTime(0.01, now);
+            nGain.gain.linearRampToValueAtTime(0.7, now + duration * 0.85);
+            nGain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + duration + 0.05);
+        }
+
+        // 2. REVERSE SWELL DROP
+        function playReverseSwellDrop(now, outGain, pitchRatio) {
+            const duration = 1.2;
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'bandpass';
+            filter.Q.value = 3.0;
+            filter.frequency.setValueAtTime(200 * pitchRatio, now);
+            filter.frequency.exponentialRampToValueAtTime(3500 * pitchRatio, now + duration * 0.9);
+
+            nGain.gain.setValueAtTime(0.01, now);
+            nGain.gain.exponentialRampToValueAtTime(1.0, now + duration * 0.9);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + duration + 0.1);
+        }
+
+        // 3. SUB KICK
+        function playSubKick(now, outGain, pitchRatio) {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(160 * pitchRatio, now);
+            osc.frequency.exponentialRampToValueAtTime(35 * pitchRatio, now + 0.12);
+
+            g.gain.setValueAtTime(1.0, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+            osc.connect(g);
+            g.connect(outGain);
+
+            osc.start(now);
+            osc.stop(now + 0.55);
+        }
+
+        // 4. CAIXA WORSHIP (Snare)
+        function playSnare(now, outGain, pitchRatio) {
+            // Tone
+            const osc = audioCtx.createOscillator();
+            const oGain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180 * pitchRatio, now);
+            osc.frequency.exponentialRampToValueAtTime(80 * pitchRatio, now + 0.1);
+            oGain.gain.setValueAtTime(0.7, now);
+            oGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.connect(oGain);
+            oGain.connect(outGain);
+            osc.start(now);
+            osc.stop(now + 0.2);
+
+            // Snare Noise
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(1000 * pitchRatio, now);
+
+            nGain.gain.setValueAtTime(0.8, now);
+            nGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + 0.3);
+        }
+
+        // 5. RIMSHOT
+        function playRimshot(now, outGain, pitchRatio) {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(650 * pitchRatio, now);
+            osc.frequency.exponentialRampToValueAtTime(300 * pitchRatio, now + 0.04);
+            g.gain.setValueAtTime(0.9, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+            osc.connect(g);
+            g.connect(outGain);
+            osc.start(now);
+            osc.stop(now + 0.08);
+        }
+
+        // 6. CLAP
+        function playClap(now, outGain, pitchRatio) {
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1200 * pitchRatio, now);
+            filter.Q.value = 1.2;
+
+            nGain.gain.setValueAtTime(0.8, now);
+            nGain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + 0.25);
+        }
+
+        // 7. HI-HAT
+        function playHiHat(now, outGain, pitchRatio) {
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(7000 * pitchRatio, now);
+
+            nGain.gain.setValueAtTime(0.6, now);
+            nGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + 0.1);
+        }
+
+        // 8. PRATO CRASH
+        function playCrash(now, outGain, pitchRatio) {
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(3000 * pitchRatio, now);
+
+            nGain.gain.setValueAtTime(0.8, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + 1.9);
+        }
+
+        // 9. PRATO INVERTIDO (REVERSE CYMBAL)
+        function playReverseCymbal(now, outGain, pitchRatio) {
+            const duration = 1.4;
+            const noise = createNoiseBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const nGain = audioCtx.createGain();
+
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(2500 * pitchRatio, now);
+
+            nGain.gain.setValueAtTime(0.01, now);
+            nGain.gain.exponentialRampToValueAtTime(0.9, now + duration * 0.95);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(outGain);
+
+            noise.start(now);
+            noise.stop(now + duration + 0.05);
+        }
+
+        function createNoiseBufferSource() {
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            return noise;
+        }
+
+        function selectOctopadInspector(idx) {
+            selectedOctopadIndex = idx;
+            const p = octopadParams[idx];
+
+            document.getElementById('inspector-pad-name').innerText = p.name;
+            document.getElementById('slider-inspector-pitch').value = p.pitch;
+            document.getElementById('slider-inspector-pan').value = p.pan;
+            document.getElementById('slider-inspector-vol').value = p.volume;
+            document.getElementById('slider-inspector-reverb').value = p.reverb;
+
+            document.getElementById('val-inspector-pitch').innerText = `${p.pitch} semitons`;
+            document.getElementById('val-inspector-pan').innerText = p.pan === 0 ? 'C' : (p.pan < 0 ? `L ${Math.abs(Math.round(p.pan * 100))}` : `R ${Math.round(p.pan * 100)}`);
+            document.getElementById('val-inspector-vol').innerText = `${Math.round(p.volume * 100)}%`;
+            document.getElementById('val-inspector-reverb').innerText = `${Math.round(p.reverb * 100)}%`;
+        }
+
+        function updatePadInspectorParam(param, val) {
+            const p = octopadParams[selectedOctopadIndex];
+            const numVal = parseFloat(val);
+
+            if (param === 'pitch') {
+                p.pitch = parseInt(val);
+                document.getElementById('val-inspector-pitch').innerText = `${p.pitch} semitons`;
+            } else if (param === 'pan') {
+                p.pan = numVal;
+                document.getElementById('val-inspector-pan').innerText = p.pan === 0 ? 'C' : (p.pan < 0 ? `L ${Math.abs(Math.round(p.pan * 100))}` : `R ${Math.round(p.pan * 100)}`);
+            } else if (param === 'volume') {
+                p.volume = numVal;
+                document.getElementById('val-inspector-vol').innerText = `${Math.round(p.volume * 100)}%`;
+            } else if (param === 'reverb') {
+                p.reverb = numVal;
+                document.getElementById('val-inspector-reverb').innerText = `${Math.round(p.reverb * 100)}%`;
+            }
+        }
+
+        function changeOctopadKit(kitType) {
+            if (kitType === 'worship') {
+                octopadParams[0].pitch = 0; octopadParams[1].pitch = 0; octopadParams[2].pitch = 0;
+            } else if (kitType === 'acoustic') {
+                octopadParams[0].pitch = 2; octopadParams[3].pitch = 1; octopadParams[7].pitch = -1;
+            } else if (kitType === 'electronic') {
+                octopadParams[0].pitch = -3; octopadParams[2].pitch = -4; octopadParams[8].pitch = 3;
+            }
+            selectOctopadInspector(selectedOctopadIndex);
+        }
+
+        function updateBPM(val) {
+            currentBPM = parseInt(val);
+            document.getElementById('bpm-display').innerText = `${currentBPM} BPM`;
+
+            if (isMetronomeOn) {
+                restartMetronomeInterval();
+            }
+        }
+
+        function toggleMetronome() {
+            isMetronomeOn = !isMetronomeOn;
+            const btn = document.getElementById('metronome-toggle-btn');
+
+            if (isMetronomeOn) {
+                btn.innerText = 'DESLIGAR';
+                btn.className = 'px-3 py-1 bg-red-600 active:scale-95 text-xs font-bold text-white rounded-xl shadow-md';
+                restartMetronomeInterval();
+            } else {
+                btn.innerText = 'LIGAR';
+                btn.className = 'px-3 py-1 bg-purple-600 active:scale-95 text-xs font-bold text-white rounded-xl shadow-md';
+                if (metronomeInterval) clearInterval(metronomeInterval);
+            }
+        }
+
+        function restartMetronomeInterval() {
+            if (metronomeInterval) clearInterval(metronomeInterval);
+            const intervalMs = (60 / currentBPM) * 1000;
+
+            playMetronomeClick();
+            metronomeInterval = setInterval(() => {
+                playMetronomeClick();
+            }, intervalMs);
+        }
+
+        function playMetronomeClick() {
+            initAudioEngine();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1000, now);
+            osc.frequency.exponentialRampToValueAtTime(400, now + 0.03);
+
+            g.gain.setValueAtTime(0.3, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+            osc.connect(g);
+            g.connect(masterGainNode);
+
+            osc.start(now);
+            osc.stop(now + 0.04);
+
+            // LED Flash UI Effect
+            const led = document.getElementById('metronome-led');
+            if (led) {
+                led.className = 'w-3 h-3 rounded-full bg-purple-400 border border-purple-300 led-flash shadow-md shadow-purple-500';
+                setTimeout(() => {
+                    led.className = 'w-3 h-3 rounded-full bg-slate-700 border border-slate-600';
+                }, 120);
+            }
+        }
+
+        function handleTapTempo() {
+            const now = Date.now();
+            tapTimes.push(now);
+
+            if (tapTimes.length > 4) tapTimes.shift();
+
+            if (tapTimes.length > 1) {
+                let intervals = [];
+                for (let i = 1; i < tapTimes.length; i++) {
+                    intervals.push(tapTimes[i] - tapTimes[i - 1]);
+                }
+                const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+                const bpm = Math.round(60000 / avgInterval);
+
+                if (bpm >= 40 && bpm <= 220) {
+                    document.getElementById('slider-bpm').value = bpm;
+                    updateBPM(bpm);
+                }
+            }
+        }
+
+        function startVisualizerLoop() {
+            const canvas = document.getElementById('visualizer-canvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyserNode ? analyserNode.frequencyBinCount : 64;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function draw() {
+                requestAnimationFrame(draw);
+
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (!analyserNode) return;
+                analyserNode.getByteFrequencyData(dataArray);
+
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    barHeight = (dataArray[i] / 255) * canvas.height * 0.7;
+
+                    ctx.fillStyle = `rgba(167, 139, 250, ${0.15 + (dataArray[i] / 255) * 0.5})`;
+                    ctx.beginPath();
+                    ctx.roundRect(x, canvas.height - barHeight, barWidth - 2, barHeight, [4, 4, 0, 0]);
+                    ctx.fill();
+
+                    x += barWidth + 1;
+                }
+            }
+            draw();
+        }
+
+        function switchTab(tab) {
+            const padTab = document.getElementById('tab-pads');
+            const octopadTab = document.getElementById('tab-octopad');
+
+            const padBtn = document.getElementById('tab-pads-btn');
+            const octopadBtn = document.getElementById('tab-octopad-btn');
+
+            if (tab === 'pads') {
+                padTab.classList.remove('hidden');
+                octopadTab.classList.add('hidden');
+
+                padBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white bg-purple-600 shadow-md transition-all duration-200';
+                octopadBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all duration-200';
+            } else {
+                padTab.classList.add('hidden');
+                octopadTab.classList.remove('hidden');
+
+                octopadBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white bg-purple-600 shadow-md transition-all duration-200';
+                padBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all duration-200';
+            }
+        }
+
+        function panicStopAll() {
+            stopPadVoices(0.2);
+            activeKeyIndex = null;
+            updatePadKeyUI();
+
+            if (isMetronomeOn) {
+                toggleMetronome();
+            }
+        }
+
+        // Global Keyboard Event Listeners for Octopad
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toUpperCase();
+
+            const keyMap = {
+                '1': 0, 'Q': 0,
+                '2': 1, 'W': 1,
+                '3': 2, 'E': 2,
+                '4': 3, 'A': 3,
+                '5': 4, 'S': 4,
+                '6': 5, 'D': 5,
+                '7': 6, 'Z': 6,
+                '8': 7, 'X': 7,
+                '9': 8, 'C': 8
+            };
+
+            if (keyMap[key] !== undefined) {
+                triggerPad(keyMap[key]);
+            }
+        });
+
+        window.onload = function() {
+            renderKeyGrid();
+            selectOctopadInspector(0);
+        };
+    </script>
+</body>
+</html>
